@@ -118,6 +118,12 @@ class PromptEnhancer:
                 "model": ("STRING", {"multiline": False, "default": "gpt-4o"}),
                 "style": (all_styles, {"default": "Basic Styles > none"}),
             },
+            "optional": {
+                "max_tokens": ("INT", {"default": 4096, "min": 1, "max": 65536}),
+                "temperature": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 2.0, "step": 0.1}),
+                "top_p": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "top_k": ("INT", {"default": 10, "min": 0, "max": 500}),
+            },
         }
 
     CATEGORY = "conditioning/prompt"
@@ -132,7 +138,7 @@ class PromptEnhancer:
     def DISPLAY_NAME(cls):
         return "Prompt Enhancer LLM ✨"
 
-    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, style):
+    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, style, max_tokens=4096, temperature=None, top_p=None, top_k=None):
         """Enhance the input prompt using an OpenAI-compatible API endpoint."""
         try:
             # Extract the actual style name from "Category > style" format
@@ -145,7 +151,7 @@ class PromptEnhancer:
             style_prompt = STYLE_PROMPTS.get(style, "")
             user_content = f"{style_prompt} {prompt}" if style_prompt else prompt
 
-            enhanced_prompt = await self._call_openai_compatible(base_url, api_key, model, user_content)
+            enhanced_prompt = await self._call_openai_compatible(base_url, api_key, model, user_content, max_tokens, temperature, top_p, top_k)
             self.enhanced_prompt = enhanced_prompt
 
             # Create CLIP conditioning
@@ -162,7 +168,7 @@ class PromptEnhancer:
             conditioning = [[cond, {"pooled_output": pooled}]]
             return (conditioning, prompt)
 
-    async def _call_openai_compatible(self, base_url, api_key, model, user_content):
+    async def _call_openai_compatible(self, base_url, api_key, model, user_content, max_tokens=4096, temperature=None, top_p=None, top_k=None):
         """Call any OpenAI-compatible endpoint via async HTTP."""
         base_url = base_url.rstrip("/")
         url = f"{base_url}/chat/completions"
@@ -179,8 +185,7 @@ class PromptEnhancer:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
-            "max_tokens": 4096,
-            "temperature": 0.7,
+            "max_tokens": max_tokens or 4096,
 
             # for vllm served qwen
             "chat_template_kwargs": {
@@ -189,6 +194,12 @@ class PromptEnhancer:
             "enable_thinking": False, # for qwen
             "thinking": {"type": "disabled"} # for deepseek
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if top_k is not None:
+            payload["top_k"] = top_k
 
         logger.info(f"Calling {url} with model: {model}")
         async with aiohttp.ClientSession() as session:
