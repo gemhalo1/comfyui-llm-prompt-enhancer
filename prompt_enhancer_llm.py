@@ -132,7 +132,7 @@ class PromptEnhancer:
     def DISPLAY_NAME(cls):
         return "Prompt Enhancer LLM ✨"
 
-    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, _style_category, style):
+    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, style_category, style):
         """Enhance the input prompt using an OpenAI-compatible API endpoint."""
         try:
             style_prompt = STYLE_PROMPTS.get(style, "")
