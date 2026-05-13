@@ -1,22 +1,21 @@
 import { app } from "/scripts/app.js";
 
-// Style categories and their corresponding styles
-const styleCategories = {
-    "No Style": ["none"],
-    "Core Styles": ["detailed", "photorealistic", "cinematic", "artistic", "minimal"],
+// Style categories — must match STYLE_CATEGORIES in prompt_enhancer_llm.py
+const STYLE_CATEGORIES = {
+    "Basic Styles": ["none", "detailed", "photorealistic", "cinematic", "artistic",
+                     "minimalist", "vibrant"],
     "Fantasy & Horror": ["fantasy", "horror", "dark fantasy", "heavenly"],
-    "Modern Aesthetics": ["cyberpunk", "steampunk", "street art", "vaporwave"],
-    "Art Movements": ["abstract", "expressionist", "abstract expressionist", "futurist", "surrealist", 
-                    "art nouveau", "art deco", "baroque", "renaissance", "pop art", "bauhaus", 
-                    "romanticist", "dada"],
-    "Asian Art Styles": ["anime", "studio ghibli", "ukiyo-e", "sumi-e", "howls castle"],
-    "Traditional Media": ["oil painting", "watercolor", "gouache", "pencil sketch", 
-                        "charcoal drawing", "pastel art"],
-    "Digital & Contemporary": ["3d render", "digital art", "concept art", "comic book", 
-                             "pixel art", "low poly", "isometric"],
-    "Photography & Studio": ["studio photography", "vibrant"],
-    "Decorative Arts": ["stained glass", "mosaic", "gothic"],
-    "Period & Style": ["retro", "vintage"]
+    "Traditional Art": ["oil painting", "watercolor", "abstract expressionist",
+                        "hyperrealist", "cubist"],
+    "Art Movements": ["art nouveau", "art deco", "baroque", "renaissance", "pop art", "bauhaus",
+                      "romanticist", "dada"],
+    "Asian Art Styles": ["anime", "studio ghibli", "ukiyo-e", "sumi-e"],
+    "Traditional Media": ["oil painting", "watercolor", "pencil sketch",
+                          "charcoal drawing", "pastel art"],
+    "Digital & Contemporary": ["3d render", "digital art", "concept art", "comic book",
+                               "pixel art", "low poly", "isometric"],
+    "Genre & Theme": ["cyberpunk", "steampunk", "gothic", "vaporwave", "retro", "vintage"],
+    "Decorative Arts": ["stained glass", "mosaic", "street art"],
 };
 
 app.registerExtension({
@@ -27,19 +26,16 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function() {
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
 
-                // Get widget indices
                 const categoryIndex = this.widgets.findIndex(w => w.name === "style_category");
                 const styleIndex = this.widgets.findIndex(w => w.name === "style");
 
                 if (categoryIndex === -1 || styleIndex === -1) return r;
 
-                // Add callback to category widget
                 const categoryWidget = this.widgets[categoryIndex];
                 const styleWidget = this.widgets[styleIndex];
 
                 categoryWidget.callback = function(value) {
-                    // Update style widget options based on selected category
-                    const styles = styleCategories[value] || ["none"];
+                    const styles = STYLE_CATEGORIES[value] || ["none"];
                     styleWidget.options.values = styles;
                     styleWidget.value = styles[0];
                     app.graph.setDirtyCanvas(true);
