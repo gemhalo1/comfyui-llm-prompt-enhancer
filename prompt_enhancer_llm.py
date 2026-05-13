@@ -179,8 +179,15 @@ class PromptEnhancer:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
-            "max_tokens": 200,
+            "max_tokens": 4096,
             "temperature": 0.7,
+
+            # for vllm served qwen
+            "chat_template_kwargs": {
+                "enable_thinking": False
+            },
+            "enable_thinking": False, # for qwen
+            "thinking": {"type": "disabled"} # for deepseek
         }
 
         logger.info(f"Calling {url} with model: {model}")
@@ -192,8 +199,21 @@ class PromptEnhancer:
         if "choices" not in data or not data["choices"]:
             raise ValueError("No choices in API response")
 
-        content = data["choices"][0]["message"]["content"]
-        logger.info(f"Received response: {content[:100]}...")
+        message = data["choices"][0].get("message", {})
+
+        # Extract content: may be a string, a list of parts, or missing entirely
+        raw_content = message.get("content")
+        if isinstance(raw_content, list):
+            content = "".join(
+                part.get("text", "") for part in raw_content if part.get("type") == "text"
+            )
+        else:
+            content = raw_content
+            logger.info(f" enhanced prompt: {content}")
+        if not content:
+            content = user_content
+            logger.info(f"no enhanced content, use original prompt: {content}")
+
         return content
 
     def _load_config(self):
