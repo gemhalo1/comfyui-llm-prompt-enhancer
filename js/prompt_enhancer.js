@@ -21,28 +21,73 @@ const STYLE_CATEGORIES = {
 app.registerExtension({
     name: "pinkpixel.prompt_enhancer",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "PromptEnhancer") {
-            const onNodeCreated = nodeType.prototype.onNodeCreated;
-            nodeType.prototype.onNodeCreated = function() {
-                const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
+        if (nodeData.name !== "PromptEnhancer") return;
 
-                const categoryIndex = this.widgets.findIndex(w => w.name === "style_category");
-                const styleIndex = this.widgets.findIndex(w => w.name === "style");
+        const onNodeCreated = nodeType.prototype.onNodeCreated;
+        nodeType.prototype.onNodeCreated = function() {
+            const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
 
-                if (categoryIndex === -1 || styleIndex === -1) return r;
+            const categoryWidget = this.widgets.find(w => w.name === "style_category");
+            const styleWidget = this.widgets.find(w => w.name === "style");
 
-                const categoryWidget = this.widgets[categoryIndex];
-                const styleWidget = this.widgets[styleIndex];
+            if (!categoryWidget || !styleWidget) return r;
 
-                categoryWidget.callback = function(value) {
-                    const styles = STYLE_CATEGORIES[value] || ["none"];
-                    styleWidget.options.values = styles;
-                    styleWidget.value = styles[0];
-                    app.graph.setDirtyCanvas(true);
-                };
+            // Track last known category to detect changes
+            this._peLastCategory = categoryWidget.value;
 
-                return r;
+            // Wrap the existing combo callback — ComfyUI combo widgets
+            // fire the `callback` on selection change
+            const origCallback = categoryWidget.callback;
+            categoryWidget.callback = function(value) {
+                if (origCallback) origCallback.call(this, value);
+                updateStyles(this);
             };
-        }
+
+            // Also hook the original callback in case ComfyUI uses a different mechanism
+            const self = this;
+            Object.defineProperty(this, "__peUpdateStyles", {
+                get() {
+                    return function() {
+                        const cat = categoryWidget.value;
+                        if (cat !== self._peLastCategory) {
+                            self._peLastCategory = cat;
+                            const styles = STYLE_CATEGORIES[cat] || ["none"];
+                            styleWidget.options.values = styles;
+                            // Reset to first valid style if current value is not in the new list
+                            if (!styles.includes(styleWidget.value)) {
+                                styleWidget.value = styles[0];
+                            }
+                        }
+                    };
+                },
+                set() {},
+                enumerable: false,
+            });
+
+            return r;
+        };
+
+        // onDrawForeground runs every frame — check for category change here
+        const onDrawForeground = nodeType.prototype.onDrawForeground;
+        nodeType.prototype.onDrawForeground = function() {
+            const r = onDrawForeground ? onDrawForeground.apply(this, arguments) : undefined;
+
+            const categoryWidget = this.widgets.find(w => w.name === "style_category");
+            const styleWidget = this.widgets.find(w => w.name === "style");
+
+            if (!categoryWidget || !styleWidget) return r;
+
+            const cat = categoryWidget.value;
+            if (cat !== this._peLastCategory) {
+                this._peLastCategory = cat;
+                const styles = STYLE_CATEGORIES[cat] || ["none"];
+                styleWidget.options.values = styles;
+                if (!styles.includes(styleWidget.value)) {
+                    styleWidget.value = styles[0];
+                }
+            }
+
+            return r;
+        };
     }
 });

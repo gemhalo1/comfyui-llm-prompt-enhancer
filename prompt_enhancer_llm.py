@@ -104,9 +104,10 @@ class PromptEnhancer:
 
     @classmethod
     def INPUT_TYPES(cls):
-        category_names = list(STYLE_CATEGORIES.keys())
-        default_category = category_names[0]
-        default_styles = STYLE_CATEGORIES[default_category]
+        all_styles = []
+        for category, styles in STYLE_CATEGORIES.items():
+            all_styles.append(f"--- {category} ---")
+            all_styles.extend([f"{category} > {s}" for s in styles])
 
         return {
             "required": {
@@ -115,8 +116,7 @@ class PromptEnhancer:
                 "base_url": ("STRING", {"multiline": False, "default": "https://api.openai.com/v1"}),
                 "api_key": ("STRING", {"multiline": False, "default": ""}),
                 "model": ("STRING", {"multiline": False, "default": "gpt-4o"}),
-                "style_category": (category_names, {"default": default_category}),
-                "style": (default_styles, {"default": default_styles[0]}),
+                "style": (all_styles, {"default": "Basic Styles > none"}),
             },
         }
 
@@ -132,9 +132,16 @@ class PromptEnhancer:
     def DISPLAY_NAME(cls):
         return "Prompt Enhancer LLM ✨"
 
-    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, style_category, style):
+    async def enhance_prompt(self, clip, prompt, base_url, api_key, model, style):
         """Enhance the input prompt using an OpenAI-compatible API endpoint."""
         try:
+            # Extract the actual style name from "Category > style" format
+            # Skip separator lines like "--- Art Movements ---"
+            if style.startswith("---") and style.endswith("---"):
+                style = "none"
+            else:
+                style = style.split(" > ")[-1]
+
             style_prompt = STYLE_PROMPTS.get(style, "")
             user_content = f"{style_prompt} {prompt}" if style_prompt else prompt
 
@@ -155,9 +162,9 @@ class PromptEnhancer:
             conditioning = [[cond, {"pooled_output": pooled}]]
             return (conditioning, prompt)
 
-    async def _call_openai_compatible(self, api_url, api_key, model, user_content):
+    async def _call_openai_compatible(self, base_url, api_key, model, user_content):
         """Call any OpenAI-compatible endpoint via async HTTP."""
-        base_url = api_url.rstrip("/")
+        base_url = base_url.rstrip("/")
         url = f"{base_url}/chat/completions"
 
         headers = {
